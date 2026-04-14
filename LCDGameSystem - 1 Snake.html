@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Snake</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+        :root {
+            /* Nokia 3310 LCD Palette */
+            --lcd-bg: #9eb586;    
+            --lcd-ink: #2b3324;   
+            --lcd-ink-dim: rgba(43, 51, 36, 0.1);
+            --phone-body: #1a1a1a;
+            --bezel: #252525;
+            --accent: #444; 
+        }
+
+        body {
+            background-color: #050505; 
+            color: var(--lcd-ink);
+            font-family: 'VT323', monospace;
+            touch-action: none;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .handset-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 96vw;
+            height: 98vh;
+            max-width: 440px; /* Slightly wider to accommodate new grid */
+            max-height: 850px;
+            background-color: var(--phone-body);
+            border-radius: 45px;
+            padding: 20px 15px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.9), inset 0 2px 4px rgba(255,255,255,0.05);
+            border: 2px solid #222;
+            position: relative;
+        }
+
+        .phone-screen {
+            background-color: var(--lcd-bg);
+            width: 100%;
+            flex: 1;
+            margin-bottom: 25px;
+            border: 15px solid var(--bezel); 
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            box-shadow: inset 0 10px 20px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+
+        /* Nokia 3310 Style Header */
+        .game-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            border-bottom: 2px solid var(--lcd-ink);
+            z-index: 10;
+            background: rgba(43, 51, 36, 0.05);
+        }
+
+        .score-group {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+        }
+
+        .score-label { font-size: 14px; text-transform: uppercase; font-weight: bold; }
+        .score-value { font-size: 28px; font-weight: bold; }
+
+        .display-container {
+            flex: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            /* Balanced padding to keep boundary spacing consistent */
+            padding: 4px; 
+        }
+
+        .canvas-wrapper {
+            position: relative;
+            border: 2px solid var(--lcd-ink);
+            background: transparent;
+        }
+
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+        }
+
+        .controls-container {
+            width: 100%;
+            padding-bottom: 15px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            user-select: none;
+            position: relative;
+            height: 200px;
+        }
+
+        .mode-toggle {
+            position: absolute;
+            left: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .toggle-switch {
+            width: 34px;
+            height: 60px;
+            background: #000;
+            border-radius: 17px;
+            border: 2px solid #444;
+            padding: 3px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            transition: all 0.3s;
+        }
+
+        .toggle-switch.swipe { justify-content: flex-end; }
+
+        .toggle-knob {
+            width: 24px;
+            height: 24px;
+            background: #666;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .toggle-switch.swipe .toggle-knob { background: #888; }
+
+        .toggle-label {
+            color: #777;
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .d-pad {
+            position: relative;
+            width: 160px;
+            height: 160px;
+            background: #000;
+            border-radius: 50%;
+            box-shadow: 0 10px 0 #000, 0 15px 30px rgba(0,0,0,0.6);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            border: 6px solid #333;
+            transition: all 0.4s ease;
+            overflow: hidden;
+        }
+
+        .d-pad.swipe-mode { 
+            grid-template-columns: 1fr;
+            grid-template-rows: 1fr;
+            background: #111;
+            border-color: #222;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 5px 0 #000;
+        }
+
+        .pad-btn {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+            font-size: 32px;
+            cursor: pointer;
+            background: #181818;
+            border: 1px solid #252525;
+            transition: opacity 0.3s, background 0.1s;
+        }
+
+        .swipe-mode .pad-btn {
+            display: none;
+        }
+
+        .touchpad-active-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .swipe-mode .touchpad-active-overlay {
+            display: block;
+        }
+
+        .pad-btn[data-dir="up"] { border-radius: 12px 12px 0 0; }
+        .pad-btn[data-dir="down"] { border-radius: 0 0 12px 12px; }
+        .pad-btn[data-dir="left"] { border-radius: 12px 0 0 12px; }
+        .pad-btn[data-dir="right"] { border-radius: 0 12px 12px 0; }
+
+        .pad-btn.active {
+            color: #fff;
+            background: #252525;
+            box-shadow: inset 0 0 8px rgba(255,255,255,0.1);
+            transform: scale(0.96);
+        }
+
+        .pad-center {
+            background: #0a0a0a;
+            border: 2px solid #1a1a1a;
+            pointer-events: none;
+        }
+
+        .swipe-mode .pad-center { display: none; }
+
+        .screen-overlay {
+            position: absolute;
+            inset: 0;
+            background: var(--lcd-bg);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+
+        .hidden { display: none; }
+        .main-title { font-size: 100px; font-weight: bold; margin-bottom: 20px; letter-spacing: -5px; line-height: 1; }
+
+        .btn-action {
+            background: var(--lcd-ink);
+            color: var(--lcd-bg);
+            padding: 14px 50px;
+            font-family: 'VT323', monospace;
+            font-size: 38px;
+            border: none;
+            box-shadow: 5px 5px 0 rgba(0,0,0,0.25);
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .lcd-grid {
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(to right, rgba(0,0,0,0.03) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(0,0,0,0.03) 1px, transparent 1px);
+            background-size: 3px 3px;
+            pointer-events: none;
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="handset-container">
+        <div class="phone-screen">
+            <div class="lcd-grid"></div>
+            <div class="game-header" id="score-bar">
+                <div class="score-group">
+                    <span id="score-current" class="score-value">0</span>
+                </div>
+                <div class="score-group">
+                    <span class="score-label">HI:</span>
+                    <span id="score-best" class="score-value">0</span>
+                </div>
+            </div>
+
+            <div class="display-container">
+                <div class="canvas-wrapper" id="canvas-boundary">
+                    <canvas id="game-canvas"></canvas>
+                    
+                    <div id="start-screen" class="screen-overlay">
+                        <h1 class="main-title">SNAKE</h1>
+                        <button class="btn-action" onclick="initGame()">START</button>
+                    </div>
+
+                    <div id="game-over-screen" class="screen-overlay hidden">
+                        <h2 style="font-size: 52px; font-weight: bold; margin-bottom: 5px;">CRASHED</h2>
+                        <p id="final-score-val" style="font-size: 36px; margin-bottom: 25px;">0</p>
+                        <button class="btn-action" onclick="initGame()">RETRY</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-container">
+            <div class="mode-toggle">
+                <span class="toggle-label">Tap</span>
+                <div class="toggle-switch" id="control-toggle">
+                    <div class="toggle-knob"></div>
+                </div>
+                <span class="toggle-label">Swipe</span>
+            </div>
+            
+            <div class="d-pad" id="dpad">
+                <div class="touchpad-active-overlay"></div>
+                <div style="background:transparent; border:none;"></div>
+                <div class="pad-btn" data-dir="up">▲</div>
+                <div style="background:transparent; border:none;"></div>
+                <div class="pad-btn" data-dir="left">◀</div>
+                <div class="pad-center"></div>
+                <div class="pad-btn" data-dir="right">▶</div>
+                <div style="background:transparent; border:none;"></div>
+                <div class="pad-btn" data-dir="down">▼</div>
+                <div style="background:transparent; border:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreCurEl = document.getElementById('score-current');
+        const scoreBestEl = document.getElementById('score-best');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreVal = document.getElementById('final-score-val');
+        const dpad = document.getElementById('dpad');
+        const controlToggle = document.getElementById('control-toggle');
+        const canvasWrapper = document.getElementById('canvas-boundary');
+
+        // Widened from 20 to 22
+        const GRID_COUNT_X = 22; 
+        let GRID_COUNT_Y = 20; 
+        let GRID_SIZE = 0;
+        
+        let snake = [];
+        let food = { x: 5, y: 5 };
+        let dx = 0, dy = 0;
+        let nextDx = 0, nextDy = -1;
+        let score = 0;
+        let highScore = localStorage.getItem('snake_lcd_best') || 0;
+        let gameLoop = null;
+        let gameActive = false;
+        let speed = 150;
+        let controlMode = 'tap';
+
+        scoreBestEl.textContent = highScore;
+
+        function resize() {
+            const container = canvasWrapper.parentElement;
+            // Balance gutters (8px total subtract)
+            const availableW = container.clientWidth - 8; 
+            const availableH = container.clientHeight - 8;
+            
+            GRID_SIZE = Math.floor(availableW / GRID_COUNT_X);
+            GRID_COUNT_Y = Math.floor(availableH / GRID_SIZE);
+            
+            const actualPixelW = GRID_SIZE * GRID_COUNT_X;
+            const actualPixelH = GRID_SIZE * GRID_COUNT_Y;
+            
+            canvas.width = actualPixelW;
+            canvas.height = actualPixelH;
+            
+            canvasWrapper.style.width = actualPixelW + 'px';
+            canvasWrapper.style.height = actualPixelH + 'px';
+
+            if (gameActive) drawFrame();
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, dur) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'square'; 
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.015, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + dur);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + dur);
+            } catch(e) {}
+        }
+
+        function initGame() {
+            resize(); 
+            const midX = Math.floor(GRID_COUNT_X / 2);
+            const midY = Math.floor(GRID_COUNT_Y / 2);
+            
+            snake = [
+                { x: midX, y: midY }, 
+                { x: midX, y: midY + 1 }, 
+                { x: midX, y: midY + 2 }
+            ];
+            dx = 0; dy = -1;
+            nextDx = 0; nextDy = -1;
+            score = 0;
+            speed = 130;
+            updateScore();
+            spawnFood();
+            gameActive = true;
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            if (gameLoop) clearInterval(gameLoop);
+            gameLoop = setInterval(update, speed);
+            playTone(523, 0.1); 
+        }
+
+        function spawnFood() {
+            food = {
+                x: Math.floor(Math.random() * (GRID_COUNT_X - 2)) + 1,
+                y: Math.floor(Math.random() * (GRID_COUNT_Y - 2)) + 1
+            };
+            if (snake.some(p => p.x === food.x && p.y === food.y)) spawnFood();
+        }
+
+        function updateScore() {
+            scoreCurEl.textContent = score;
+            if (score > highScore) {
+                highScore = score;
+                scoreBestEl.textContent = highScore;
+                localStorage.setItem('snake_lcd_best', highScore);
+            }
+        }
+
+        function update() {
+            dx = nextDx; dy = nextDy;
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+
+            if (head.x < 0 || head.x >= GRID_COUNT_X || head.y < 0 || head.y >= GRID_COUNT_Y || 
+                snake.some(p => p.x === head.x && p.y === head.y)) {
+                endGame();
+                return;
+            }
+
+            snake.unshift(head);
+
+            if (head.x === food.x && head.y === food.y) {
+                score += 1;
+                updateScore();
+                spawnFood();
+                playTone(1046, 0.05); 
+                if (speed > 50) {
+                    clearInterval(gameLoop);
+                    speed = Math.max(50, speed - 2);
+                    gameLoop = setInterval(update, speed);
+                }
+            } else {
+                snake.pop();
+            }
+
+            drawFrame();
+        }
+
+        function drawFrame() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const inkColor = "#2b3324";
+            
+            ctx.fillStyle = inkColor;
+            
+            const fx = food.x * GRID_SIZE;
+            const fy = food.y * GRID_SIZE;
+            const dotSize = Math.max(1, Math.floor(GRID_SIZE / 4));
+            const center = GRID_SIZE / 2;
+            
+            ctx.fillRect(fx + center - dotSize/2, fy + center - dotSize/2, dotSize, dotSize);
+            ctx.fillRect(fx + center - dotSize/2, fy + center - dotSize*1.5, dotSize, dotSize);
+            ctx.fillRect(fx + center - dotSize/2, fy + center + dotSize*0.5, dotSize, dotSize);
+            ctx.fillRect(fx + center - dotSize*1.5, fy + center - dotSize/2, dotSize, dotSize);
+            ctx.fillRect(fx + center + dotSize*0.5, fy + center - dotSize/2, dotSize, dotSize);
+
+            snake.forEach((part, i) => {
+                const px = part.x * GRID_SIZE;
+                const py = part.y * GRID_SIZE;
+                
+                ctx.fillStyle = inkColor;
+                ctx.fillRect(px + 1, py + 1, GRID_SIZE - 2, GRID_SIZE - 2);
+                
+                if (i === 0) {
+                    ctx.fillStyle = "#9eb586";
+                    if (dx === 1) {
+                        ctx.fillRect(px + GRID_SIZE - 4, py + 2, 2, 2);
+                        ctx.fillRect(px + GRID_SIZE - 4, py + GRID_SIZE - 4, 2, 2);
+                    } else if (dx === -1) {
+                        ctx.fillRect(px + 2, py + 2, 2, 2);
+                        ctx.fillRect(px + 2, py + GRID_SIZE - 4, 2, 2);
+                    } else if (dy === 1) {
+                        ctx.fillRect(px + 2, py + GRID_SIZE - 4, 2, 2);
+                        ctx.fillRect(px + GRID_SIZE - 4, py + GRID_SIZE - 4, 2, 2);
+                    } else if (dy === -1) {
+                        ctx.fillRect(px + 2, py + 2, 2, 2);
+                        ctx.fillRect(px + GRID_SIZE - 4, py + 2, 2, 2);
+                    }
+                }
+            });
+        }
+
+        function endGame() {
+            gameActive = false;
+            clearInterval(gameLoop);
+            playTone(130, 0.4);
+            finalScoreVal.textContent = "SCORE: " + score;
+            gameOverScreen.classList.remove('hidden');
+        }
+
+        function setDir(dir) {
+            if (!gameActive) return;
+            const moves = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+            const [nx, ny] = moves[dir];
+            if ((nx === -dx && nx !== 0) || (ny === -dy && ny !== 0)) return;
+            nextDx = nx; nextDy = ny;
+        }
+
+        let startX = 0, startY = 0;
+        let lastDir = null;
+
+        const handleTouchStart = (e) => {
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            lastDir = null;
+            
+            if (controlMode === 'tap') {
+                const element = document.elementFromPoint(startX, startY);
+                const btn = element?.closest('.pad-btn');
+                if (btn) {
+                    btn.classList.add('active');
+                    setDir(btn.getAttribute('data-dir'));
+                    playTone(300, 0.03);
+                }
+            }
+        };
+
+        const handleTouchMove = (e) => {
+            if (e.target.closest('#control-toggle')) return;
+            const touch = e.touches[0];
+            const currentX = touch.clientX;
+            const currentY = touch.clientY;
+            
+            if (controlMode === 'tap') {
+                e.preventDefault();
+                document.querySelectorAll('.pad-btn').forEach(b => b.classList.remove('active'));
+                const element = document.elementFromPoint(currentX, currentY);
+                const btn = element?.closest('.pad-btn');
+                if (btn) {
+                    btn.classList.add('active');
+                    setDir(btn.getAttribute('data-dir'));
+                }
+            } else {
+                const diffX = currentX - startX;
+                const diffY = currentY - startY;
+                const threshold = 25;
+                if (Math.max(Math.abs(diffX), Math.abs(diffY)) > threshold) {
+                    let newDir = null;
+                    if (Math.abs(diffX) > Math.abs(diffY)) {
+                        newDir = diffX > 0 ? 'right' : 'left';
+                    } else {
+                        newDir = diffY > 0 ? 'down' : 'up';
+                    }
+                    if (newDir && newDir !== lastDir) {
+                        setDir(newDir);
+                        lastDir = newDir;
+                        startX = currentX;
+                        startY = currentY;
+                    }
+                }
+            }
+        };
+
+        const handleTouchEnd = () => {
+            document.querySelectorAll('.pad-btn').forEach(b => b.classList.remove('active'));
+        };
+
+        controlToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            controlMode = controlMode === 'tap' ? 'swipe' : 'tap';
+            controlToggle.classList.toggle('swipe');
+            dpad.classList.toggle('swipe-mode');
+            playTone(600, 0.05);
+        });
+
+        document.addEventListener('touchstart', handleTouchStart, { passive: false });
+        document.addEventListener('touchmove', handleTouchMove, { passive: false });
+        document.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+        window.addEventListener('keydown', e => {
+            if (e.key === 'ArrowUp') setDir('up');
+            if (e.key === 'ArrowDown') setDir('down');
+            if (e.key === 'ArrowLeft') setDir('left');
+            if (e.key === 'ArrowRight') setDir('right');
+        });
+    </script>
+</body>
+</html>
